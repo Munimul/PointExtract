@@ -1,12 +1,13 @@
 import sys
 import glob
 import os
-import matplotlib
+import math
+import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt6.QtCore import QSize,Qt,QPoint
-from PyQt6.QtWidgets import  QApplication, QWidget, QPushButton, QVBoxLayout, QToolBar, QFileDialog, QLabel, QHBoxLayout, QMainWindow, QStatusBar
-from PyQt6.QtGui import QPixmap, QPen,QPainter,QColor, QAction, QPolygon
+from PyQt6.QtCore import QSize,Qt
+from PyQt6.QtWidgets import  QApplication, QWidget, QSlider, QVBoxLayout, QToolBar, QFileDialog, QLabel, QMainWindow, QStatusBar
+from PyQt6.QtGui import QPixmap, QPen,QPainter,QColor, QAction
 
 
 class MplCanvas(FigureCanvas):
@@ -18,35 +19,89 @@ class MplCanvas(FigureCanvas):
 
 
 class GraphWindow(QWidget):
-    def __init__(self,x,y):
+    def __init__(self,points):
         super().__init__()
 
         self.setWindowTitle("PointExtract_Plot")
-        self.x=x
-        self.y=y
+        self.points=np.array(points)
+        self.allPoints=np.vstack(self.points)
+
+        #all points calculation for every 5 degree rotation
+        for i in range(0,361,5):
+            self.allPoints=np.vstack((self.rotate(i),self.allPoints))
+
         Layout= QVBoxLayout()       
         toolbar = QToolBar()
-        sc = MplCanvas(self, width=5, height=4, dpi=100)
-        sc.axes.scatter(self.x, self.y)
-        sc.axes.axis('off')
-        sc.axes.set_aspect('equal')
-        
+        self.sc = MplCanvas(self, width=5, height=4, dpi=100)
+
+        # Plot graph initially
+        self.plotUpdate(self.points,self.allPoints)
+        self.show()
 
         button_rotate= QAction("Rotate", self)
         button_rotate.setStatusTip("Rotate points")
+        button_rotate.triggered.connect(self.rotate)
+        # slider for rotating the points
+        self.slider= QSlider(Qt.Orientation.Horizontal)
+        self.slider.setMinimum(0)
+        self.slider.setMaximum(360)
+        self.slider.setTickInterval(5)
+        self.slider.valueChanged.connect(self.onSliderValueChanged)
 
         toolbar.addAction(button_rotate)
+        toolbar.addWidget(self.slider)
         Layout.addWidget(toolbar)
-        Layout.addWidget(sc)
+        Layout.addWidget(self.sc)
 
         self.setLayout(Layout)
         self.setMinimumSize(QSize(416, 600))
+
+    def rotate(self,degree):
+        # degree to radian
+        angle=degree*np.pi/180
+        #calculate the mean of points
+        center = np.mean(self.points, axis=0)
+        # minus the mean from all points
+        translated_points = self.points - center
+        # rotation matrix
+        rotation_matrix = np.array([[np.cos(angle), -np.sin(angle)],
+                                    [np.sin(angle), np.cos(angle)]])
+        # dot product
+        rotated_points = np.dot(translated_points, rotation_matrix)
+        # rotated points
+        rotated_points += center
+
+        return rotated_points
+
         
+
+    def plotUpdate(self,points,allpoints):
+        # clear previous graph
+        self.sc.axes.cla()
+        self.sc.axes.scatter(points[:, 0], points[:, 1], color='red')
+
+        # Set the axis limits to include all points
+        x_min = allpoints[:, 0].min() - 5
+        x_max = allpoints[:, 0].max() + 5
+        y_min = allpoints[:, 1].min() - 5
+        y_max = allpoints[:, 1].max() + 5
+        self.sc.axes.set_xlim(x_min, x_max)
+        self.sc.axes.set_ylim(y_min, y_max)
+        self.sc.axes.set_aspect('equal')
+        self.sc.axes.axis('off')
+        self.sc.draw()
+
+    # slider value change triggers new graph
+    def onSliderValueChanged(self,value):
+        rotatedPoints=self.rotate(value)
+        self.plotUpdate(rotatedPoints,self.allPoints)
+
+      
 
 class DrawPoint(QLabel):
     def __init__(self, parent=None):
         super(DrawPoint, self).__init__(parent)
-        self.points = QPolygon()
+        self.points = []
         self.draw=False
 
 
@@ -56,27 +111,26 @@ class DrawPoint(QLabel):
         pen = QPen(QColor('Red'))
         pen.setWidth(4)
         qp.setPen(pen)
-        qp.drawPoints(self.points)
+        for point in self.points:
+            qp.drawPoint(point[0],point[1])
 
     def mousePressEvent(self, event):
         if self.draw and event.button() == Qt.MouseButton.LeftButton:
-            self.points.append(event.pos())
+            self.points.append([event.pos().x(),event.pos().y()])
             self.update()
+
+
 
 class MainWindow(QMainWindow):
 
     def __init__(self):
         super(MainWindow, self).__init__()
 
-
-
-
         self.setWindowTitle("PointExtract")
-
+        # this variable stores the graph window
         self.w=None #No window yet
         self.img = DrawPoint()
         self.img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         self.setCentralWidget(self.img)        
 
         toolbar = QToolBar("My main toolbar")
@@ -134,6 +188,7 @@ class MainWindow(QMainWindow):
         if file_path=='':
             pass
         else:
+            # store all the images path in the imagefiles and get the current image's index
             self.imagePath=file_path
             self.folderDir=os.path.dirname(file_path)
             self.imageFiles=glob.glob(self.folderDir+'/*.png')+glob.glob(self.folderDir+'/*.jp*g')
@@ -170,34 +225,27 @@ class MainWindow(QMainWindow):
     def onDrawButtonClick(self):
         if self.index!=None:
             self.img.draw=self.button_draw.isChecked()
+        else:
+            self.button_draw.setChecked(False)
 
     def onClearButtonClick(self):
-        self.img.points=QPolygon()
+        self.img.points=[]
         self.img.update()
 
     def onUndoButtonClick(self):
-        if not self.img.points.isEmpty():
-            self.img.points.remove(self.img.points.size()-1)
+        if len(self.img.points)>0:
+            self.img.points.pop()
             self.img.update()
 
     def onPlotButtonClick(self):
-        offset=self.img.height()
-        print(self.img.height())
-        print(len(self.img.points))
-        x=[]
-        y=[]
+        offset=self.img.height()       
+        points=[]
         if len(self.img.points)!=0:
             for point in self.img.points:
-                x.append(point.x())
-                y.append(offset-point.y())
-        print(x,y)
-        self.w = GraphWindow(x,y)  # image points start from the top left
-        self.w.show()
+                points.append([point[0],offset-point[1]])  # image points start from the top left
 
-
-    
-       
-  
+        self.w = GraphWindow(points)  
+        self.w.show() 
 
 
 if __name__ == '__main__':
