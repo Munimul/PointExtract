@@ -30,5 +30,5 @@ python labelaug.py
 ```
 
 # Demo
+![4jYVT1hG1k-ezgif com-video-to-gif-converter](https://github.com/Munimul/PointExtract/assets/77501611/6d95d89e-fea5-4a5f-a795-5159932763d1)
 
-[![Watch the video](https://img.youtube.com/vi/FTFzCMEFl3E/0.jpg)](https://www.youtube.com/watch?v=FTFzCMEFl3E)
