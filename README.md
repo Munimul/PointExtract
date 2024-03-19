@@ -31,4 +31,4 @@ python labelaug.py
 
 # Demo
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/FTFzCMEFl3E?si=5Yx0BTsMrRLCzK-_" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+[![Watch the video](https://img.youtube.com/vi/FTFzCMEFl3E/0.jpg)](https://www.youtube.com/watch?v=FTFzCMEFl3E)
