@@ -1,7 +1,7 @@
 import sys
 import glob
 import os
-import math
+import json
 import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -38,9 +38,9 @@ class GraphWindow(QWidget):
         self.plotUpdate(self.points,self.allPoints)
         self.show()
 
-        button_rotate= QAction("Rotate", self)
-        button_rotate.setStatusTip("Rotate points")
-        button_rotate.triggered.connect(self.rotate)
+        button_extract= QAction("Extract", self)
+        button_extract.setStatusTip("Extract Points in .txt file")
+        button_extract.triggered.connect(self.onExtractButtonClick)
         # slider for rotating the points
         self.slider= QSlider(Qt.Orientation.Horizontal)
         self.slider.setMinimum(0)
@@ -48,8 +48,8 @@ class GraphWindow(QWidget):
         self.slider.setTickInterval(5)
         self.slider.valueChanged.connect(self.onSliderValueChanged)
 
-        toolbar.addAction(button_rotate)
         toolbar.addWidget(self.slider)
+        toolbar.addAction(button_extract)
         Layout.addWidget(toolbar)
         Layout.addWidget(self.sc)
 
@@ -95,6 +95,16 @@ class GraphWindow(QWidget):
     def onSliderValueChanged(self,value):
         rotatedPoints=self.rotate(value)
         self.plotUpdate(rotatedPoints,self.allPoints)
+
+    def onExtractButtonClick(self):
+        dialog=QFileDialog()
+        save_dir=dialog.getExistingDirectory(self,'Select a Folder')
+        if save_dir:
+            points=self.rotate(self.slider.value())
+            with open(save_dir+'/output.txt','w') as filehandle:
+                json.dump(points.tolist(), filehandle)
+            
+
 
       
 
@@ -238,14 +248,15 @@ class MainWindow(QMainWindow):
             self.img.update()
 
     def onPlotButtonClick(self):
-        offset=self.img.height()       
-        points=[]
-        if len(self.img.points)!=0:
-            for point in self.img.points:
-                points.append([point[0],offset-point[1]])  # image points start from the top left
+        if self.img.points!=[]:
+            offset=self.img.height()       
+            points=[]
+            if len(self.img.points)!=0:
+                for point in self.img.points:
+                    points.append([point[0],offset-point[1]])  # image points start from the top left
 
-        self.w = GraphWindow(points)  
-        self.w.show() 
+            self.w = GraphWindow(points)  
+            self.w.show() 
 
 
 if __name__ == '__main__':
